@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mcraft</title>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #instructions {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0,0,0,0.5);
+            color: white;
+            padding: 10px;
+            font-family: Arial, sans-serif;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <div id="instructions">
+        WASD = Move<br>
+        SPACE = Jump<br>
+        Click = Place/Remove Block<br>
+        ESC = Toggle Mouse Control
+    </div>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.157.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.157.0/examples/jsm/",
+                "three/examples/": "https://unpkg.com/three@0.157.0/examples/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+
+        // Initialize the scene, camera, and renderer
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Add basic lighting
+        const ambientLight = new THREE.AmbientLight(0x404040);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 5, 5);
+        scene.add(ambientLight);
+        scene.add(directionalLight);
+
+        // Create a ground plane
+        const groundGeometry = new THREE.PlaneGeometry(100, 100);
+        const groundMaterial = new THREE.MeshStandardMaterial({ 
+            color: 0x567d46,
+            side: THREE.DoubleSide
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = Math.PI / 2;
+        scene.add(ground);
+
+        // Set up controls
+        const controls = new PointerLockControls(camera, document.body);
+        
+        // Movement variables
+        let moveForward = false;
+        let moveBackward = false;
+        let moveLeft = false;
+        let moveRight = false;
+        let canJump = true;
+        let velocity = new THREE.Vector3();
+
+        // Click handler for pointer lock
+        document.addEventListener('click', function() {
+            if (!controls.isLocked) {
+                controls.lock();
+            }
+        });
+
+        // Key handlers
+        const onKeyDown = function(event) {
+            switch(event.code) {
+                case 'ArrowUp':
+                case 'KeyW':
+                    moveForward = true;
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                    moveBackward = true;
+                    break;
+                case 'ArrowLeft':
+                case 'KeyA':
+                    moveLeft = true;
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    moveRight = true;
+                    break;
+                case 'Space':
+                    if (canJump) {
+                        velocity.y = 10;
+                        canJump = false;
+                    }
+                    break;
+            }
+        };
+
+        const onKeyUp = function(event) {
+            switch(event.code) {
+                case 'ArrowUp':
+                case 'KeyW':
+                    moveForward = false;
+                    break;
+                case 'ArrowDown':
+                case 'KeyS':
+                    moveBackward = false;
+                    break;
+                case 'ArrowLeft':
+                case 'KeyA':
+                    moveLeft = false;
+                    break;
+                case 'ArrowRight':
+                case 'KeyD':
+                    moveRight = false;
+                    break;
+            }
+        };
+
+        document.addEventListener('keydown', onKeyDown);
+        document.addEventListener('keyup', onKeyUp);
+
+        // Block placement
+        const cubeGeometry = new THREE.BoxGeometry(1, 1, 1);
+        const cubeMaterial = new THREE.MeshStandardMaterial({ color: 0x8b4513 });
+        
+        document.addEventListener('mousedown', (event) => {
+            if (controls.isLocked) {
+                const raycaster = new THREE.Raycaster();
+                const direction = new THREE.Vector3();
+                camera.getWorldDirection(direction);
+                raycaster.set(camera.position, direction);
+
+                if (event.button === 0) { // Left click
+                    const cube = new THREE.Mesh(cubeGeometry, cubeMaterial);
+                    const position = camera.position.clone();
+                    position.add(direction.multiplyScalar(3));
+                    cube.position.copy(position);
+                    cube.position.round();
+                    scene.add(cube);
+                }
+            }
+        });
+
+        // Position the camera
+        camera.position.y = 2;
+
+        // Animation loop
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (controls.isLocked) {
+                const delta = clock.getDelta();
+
+                // Apply gravity
+                velocity.y -= 9.8 * delta;
+
+                // Move the camera
+                const speed = 5.0;
+                if (moveForward) velocity.z = -speed;
+                if (moveBackward) velocity.z = speed;
+                if (moveLeft) velocity.x = -speed;
+                if (moveRight) velocity.x = speed;
+                if (!moveForward && !moveBackward) velocity.z = 0;
+                if (!moveLeft && !moveRight) velocity.x = 0;
+
+                controls.moveRight(velocity.x * delta);
+                controls.moveForward(-velocity.z * delta);
+                
+                camera.position.y += velocity.y * delta;
+
+                // Ground collision
+                if (camera.position.y < 2) {
+                    velocity.y = 0;
+                    camera.position.y = 2;
+                    canJump = true;
+                }
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // Handle window resizing
+        window.addEventListener('resize', onWindowResize, false);
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        animate();
+    </script>
+</body>
+</html>
